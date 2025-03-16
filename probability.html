@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>概率分布可视化教程</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@11.8.0/lib/browser/math.min.js"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-icons@latest/dist/umd/lucide.css">
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans min-h-screen">
+    <div class="min-h-screen flex flex-col">
+        <header class="bg-white border-b border-gray-200 py-5">
+            <div class="container mx-auto px-4 max-w-6xl">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-2xl font-medium font-geist-mono tracking-tight">概率分布互动教程</h1>
+                        <p class="text-gray-500 text-sm mt-1">为统计学初学者设计的深入理解概率分布的交互式学习工具</p>
+                    </div>
+                    <button id="toggle-theme" class="p-2 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors">
+                        <i data-lucide="moon" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="container mx-auto px-4 py-8 max-w-6xl flex-grow">
+            <div class="grid md:grid-cols-12 gap-8">
+                <!-- Sidebar -->
+                <div class="md:col-span-3">
+                    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden sticky top-6">
+                        <div class="p-4 border-b border-gray-200">
+                            <h2 class="font-medium">分布类型</h2>
+                        </div>
+                        <div class="divide-y divide-gray-100">
+                            <div class="p-3">
+                                <h3 class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-2">离散型分布</h3>
+                                <div class="space-y-1">
+                                    <button data-dist="bernoulli" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">伯努利分布</button>
+                                    <button data-dist="binomial" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">二项分布</button>
+                                    <button data-dist="poisson" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">泊松分布</button>
+                                    <button data-dist="geometric" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">几何分布</button>
+                                </div>
+                            </div>
+                            <div class="p-3">
+                                <h3 class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-2">连续型分布</h3>
+                                <div class="space-y-1">
+                                    <button data-dist="normal" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">正态分布</button>
+                                    <button data-dist="uniform" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">均匀分布</button>
+                                    <button data-dist="exponential" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">指数分布</button>
+                                    <button data-dist="gamma" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">伽马分布</button>
+                                    <button data-dist="t" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">t 分布</button>
+                                    <button data-dist="f" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">F 分布</button>
+                                    <button data-dist="chiSquare" class="distribution-btn text-left w-full py-1.5 px-3 rounded-md text-sm hover:bg-gray-50">卡方分布</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-gray-50 border-t border-gray-200">
+                            <p class="text-xs text-gray-500">选择一个分布类型以查看详细信息和交互可视化。</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Main Content -->
+                <div class="md:col-span-9">
+                    <!-- Initial Welcome Message -->
+                    <div id="welcome-screen" class="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="bar-chart-2" class="w-8 h-8 text-gray-400"></i>
+                        </div>
+                        <h2 class="text-xl font-medium mb-3">欢迎使用概率分布互动教程</h2>
+                        <p class="text-gray-500 max-w-lg mx-auto mb-6">这个交互式教程将帮助你深入理解不同的概率分布。通过调整参数来观察分布形状的变化，建立直观的理解。</p>
+                        <p class="text-sm text-gray-400">请从左侧选择一个分布类型开始学习</p>
+                    </div>
+
+                    <!-- Distribution Content (Initially Hidden) -->
+                    <div id="distribution-content" class="hidden space-y-6">
+                        <!-- Distribution Header -->
+                        <div class="bg-white border border-gray-200 rounded-lg p-6">
+                            <h2 id="dist-title" class="text-2xl font-medium mb-2"></h2>
+                            <p id="dist-description" class="text-gray-500"></p>
+                        </div>
+
+                        <!-- Main Visualization + Parameters Section -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <!-- Parameters Panel -->
+                            <div>
+                                <div class="bg-white border border-gray-200 rounded-lg p-6">
+                                    <h3 class="text-base font-medium mb-4 flex items-center">
+                                        <i data-lucide="sliders" class="w-4 h-4 mr-2"></i>参数设置
+                                    </h3>
+                                    <div id="params-container" class="space-y-5">
+                                        <!-- Parameters will be injected here -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Visualization Panel -->
+                            <div class="md:col-span-2">
+                                <div class="bg-white border border-gray-200 rounded-lg p-6">
+                                    <h3 class="text-base font-medium mb-4 flex items-center">
+                                        <i data-lucide="line-chart" class="w-4 h-4 mr-2"></i>分布可视化
+                                    </h3>
+                                    <div class="h-64 relative">
+                                        <canvas id="distribution-chart"></canvas>
+                                    </div>
+                                    <div class="mt-3 text-xs text-gray-500 flex justify-between items-center">
+                                        <span id="chart-type-label"></span>
+                                        <button id="toggle-cumulative" class="text-gray-500 hover:text-gray-900 text-xs border border-gray-200 rounded px-2 py-1 transition-colors">
+                                            切换累积分布
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Statistics and Properties -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Distribution Properties -->
+                            <div class="bg-white border border-gray-200 rounded-lg p-6">
+                                <h3 class="text-base font-medium mb-4 flex items-center">
+                                    <i data-lucide="info" class="w-4 h-4 mr-2"></i>统计量
+                                </h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-gray-50 p-3 rounded border border-gray-100">
+                                        <div class="text-xs text-gray-500">期望值</div>
+                                        <div id="expected-value" class="text-lg font-medium font-geist-mono mt-1">0</div>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded border border-gray-100">
+                                        <div class="text-xs text-gray-500">方差</div>
+                                        <div id="variance-value" class="text-lg font-medium font-geist-mono mt-1">0</div>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded border border-gray-100">
+                                        <div class="text-xs text-gray-500">标准差</div>
+                                        <div id="std-dev-value" class="text-lg font-medium font-geist-mono mt-1">0</div>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded border border-gray-100">
+                                        <div class="text-xs text-gray-500">中位数</div>
+                                        <div id="median-value" class="text-lg font-medium font-geist-mono mt-1">0</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Probability Calculator -->
+                            <div class="bg-white border border-gray-200 rounded-lg p-6">
+                                <h3 class="text-base font-medium mb-4 flex items-center">
+                                    <i data-lucide="calculator" class="w-4 h-4 mr-2"></i>概率计算器
+                                </h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm text-gray-700 mb-1">计算类型</label>
+                                        <select id="prob-calc-type" class="w-full border border-gray-200 rounded-md p-2 text-sm">
+                                            <option value="eq">P(X = x)</option>
+                                            <option value="le">P(X ≤ x)</option>
+                                            <option value="ge">P(X ≥ x)</option>
+                                            <option value="between">P(a ≤ X ≤ b)</option>
+                                        </select>
+                                    </div>
+                                    <div id="single-value-input" class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm text-gray-700 mb-1">x 值</label>
+                                            <input type="number" id="prob-calc-x" class="w-full border border-gray-200 rounded-md p-2 text-sm" step="any">
+                                        </div>
+                                        <div class="flex items-end">
+                                            <button id="calc-probability" class="bg-black text-white rounded-md py-2 px-4 text-sm hover:bg-gray-800 transition-colors w-full">
+                                                计算概率
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="range-value-input" class="hidden grid-cols-3 gap-4">
+                                        <div>
+                                            <label class="block text-sm text-gray-700 mb-1">下限 a</label>
+                                            <input type="number" id="prob-calc-a" class="w-full border border-gray-200 rounded-md p-2 text-sm" step="any">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm text-gray-700 mb-1">上限 b</label>
+                                            <input type="number" id="prob-calc-b" class="w-full border border-gray-200 rounded-md p-2 text-sm" step="any">
+                                        </div>
+                                        <div class="flex items-end">
+                                            <button id="calc-probability-range" class="bg-black text-white rounded-md py-2 px-4 text-sm hover:bg-gray-800 transition-colors w-full">
+                                                计算概率
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="probability-result" class="bg-gray-50 p-3 rounded border border-gray-100 mt-4 hidden">
+                                        <div class="text-xs text-gray-500">计算结果</div>
+                                        <div id="prob-result-value" class="text-lg font-medium font-geist-mono mt-1">0</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Formula and Applications Section -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Mathematical Formula -->
+                            <div class="bg-white border border-gray-200 rounded-lg p-6">
+                                <h3 class="text-base font-medium mb-4 flex items-center">
+                                    <i data-lucide="code" class="w-4 h-4 mr-2"></i>数学公式
+                                </h3>
+                                <div id="formula-container" class="bg-gray-50 p-4 rounded-md border border-gray-100 mb-3 overflow-x-auto">
+                                    <!-- Formula will be injected here -->
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    <h4 class="font-medium mb-2">参数说明：</h4>
+                                    <ul id="parameter-descriptions" class="list-disc pl-5 space-y-1">
+                                        <!-- Parameter descriptions will be injected here -->
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Applications -->
+                            <div class="bg-white border border-gray-200 rounded-lg p-6">
+                                <h3 class="text-base font-medium mb-4 flex items-center">
+                                    <i data-lucide="lightbulb" class="w-4 h-4 mr-2"></i>实际应用
+                                </h3>
+                                <ul id="applications-list" class="list-disc pl-5 space-y-2 text-gray-700">
+                                    <!-- Applications will be injected here -->
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Simulation Section -->
+                        <div class="bg-white border border-gray-200 rounded-lg p-6">
+                            <h3 class="text-base font-medium mb-4 flex items-center">
+                                <i data-lucide="activity" class="w-4 h-4 mr-2"></i>随机抽样模拟
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm text-gray-700 mb-1">样本量</label>
+                                        <div class="flex items-center space-x-3">
+                                            <input type="range" id="sample-size" min="10" max="1000" step="10" value="100" class="flex-grow">
+                                            <span id="sample-size-value" class="text-sm font-medium w-10 text-right">100</span>
+                                        </div>
+                                    </div>
+                                    <button id="generate-samples" class="bg-black text-white rounded-md py-2 px-4 text-sm hover:bg-gray-800 transition-colors w-full">
+                                        生成随机样本
+                                    </button>
+                                    <div class="bg-gray-50 p-3 rounded border border-gray-100">
+                                        <div class="text-xs text-gray-500">样本均值</div>
+                                        <div id="sample-mean" class="text-base font-medium font-geist-mono mt-1">-</div>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded border border-gray-100">
+                                        <div class="text-xs text-gray-500">样本标准差</div>
+                                        <div id="sample-std" class="text-base font-medium font-geist-mono mt-1">-</div>
+                                    </div>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <div class="h-64 relative">
+                                        <canvas id="simulation-chart"></canvas>
+                                    </div>
+                                    <div class="mt-3 text-xs text-gray-500 text-center">
+                                        随机样本直方图与密度线
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="bg-white border-t border-gray-200 py-5 mt-12">
+            <div class="container mx-auto px-4 max-w-6xl">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <p class="text-sm text-gray-500">© 2025 河南科技学院齐安静.</p>
+                    <div class="mt-4 md:mt-0">
+                        <button id="show-help" class="text-sm text-gray-500 hover:text-gray-700">使用指南</button>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium">概率分布互动教程使用指南</h2>
+                <button id="close-help" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <h3 class="font-medium mb-2">基本使用</h3>
+                    <p class="text-gray-600 text-sm">从左侧面板选择一个概率分布，然后使用参数滑块调整分布的参数，观察分布形状的变化。</p>
+                </div>
+                <div>
+                    <h3 class="font-medium mb-2">功能模块</h3>
+                    <ul class="text-gray-600 text-sm space-y-2">
+                        <li><strong>参数设置：</strong> 调整分布的参数，实时查看分布形状的变化。</li>
+                        <li><strong>分布可视化：</strong> 显示概率质量函数(PMF)或概率密度函数(PDF)，也可切换到累积分布函数(CDF)。</li>
+                        <li><strong>统计量：</strong> 显示分布的期望值、方差、标准差和中位数。</li>
+                        <li><strong>概率计算器：</strong> 计算特定值或区间的概率。</li>
+                        <li><strong>随机抽样模拟：</strong> 从当前分布生成随机样本，并画出随机样本的直方图和密度线。</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-medium mb-2">学习建议</h3>
+                    <ul class="text-gray-600 text-sm space-y-2">
+                        <li>首先了解分布的基本定义和性质。</li>
+                        <li>通过调整参数观察分布形状的变化，建立直观理解。</li>
+                        <li>使用概率计算器加深对概率计算的理解。</li>
+                        <li>通过随机抽样模拟，理解样本统计量与总体参数的关系。</li>
+                        <li>尝试将所学知识应用到实际问题中。</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="distributions.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // 防止缩放
+        window.addEventListener("wheel", (e) => {
+            const isPinching = e.ctrlKey;
+            if (isPinching) e.preventDefault();
+        }, { passive: false });
+    </script>
+</body>
+</html>

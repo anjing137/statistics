@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ANOVA 动态交互式可视化</title>
+  <!-- 引入 Tailwind CSS 和 d3.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    /* 自定义 SVG 样式，调整颜色与线条，与先前项目风格一致 */
+    .point {
+      fill: #3b82f6; /* Tailwind 蓝色 */
+      cursor: pointer;
+    }
+    .group-mean {
+      stroke: #ef4444; /* Tailwind 红色 */
+      stroke-width: 2;
+    }
+    .overall-mean {
+      stroke: #6b7280; /* Tailwind 灰色 */
+      stroke-width: 2;
+      stroke-dasharray: 4 4;
+    }
+    .line-to-mean {
+      stroke: #6b7280;
+      stroke-dasharray: 2 2;
+    }
+    .tooltip {
+      position: absolute;
+      background-color: #fff;
+      padding: 0.25rem 0.5rem;
+      border: 1px solid #d1d5db;
+      pointer-events: none;
+      font-size: 0.875rem;
+      border-radius: 0.25rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <!-- 页头 -->
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl font-bold mb-2">ANOVA 动态交互式可视化</h1>
+      <p class="text-gray-600">通过交互操作理解组内与组间方差及 F 值计算</p>
+    </header>
+    
+    <!-- 主体区域：左右两栏布局 -->
+    <div class="flex flex-col md:flex-row gap-4">
+      <!-- 左侧：信息展示区与重置按钮 -->
+      <div class="w-full md:w-1/4 flex flex-col gap-4">
+        <!-- 信息展示区 -->
+        <div id="info" class="bg-white rounded-lg shadow-sm p-3 border border-gray-100">
+          <p>组内方差 (SSW): <span id="ssw" class="font-medium">0</span></p>
+          <p>组间方差 (SSB): <span id="ssb" class="font-medium">0</span></p>
+          <p>总方差 (SST): <span id="sst" class="font-medium">0</span></p>
+          <p>F 值 (F = MSB / MSW): <span id="fValue" class="font-medium">0</span></p>
+        </div>
+        <!-- 重置按钮 -->
+        <div class="text-center">
+          <button id="reset" class="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">重置数据点</button>
+        </div>
+        <div class="mt-4 p-4 bg-gray-100 rounded-lg">
+            <p style="text-indent: 2em;">
+                本项目是一个动态交互式可视化工具，旨在帮助用户理解方差分析（ANOVA）的基本概念。
+            </p>
+            <p style="text-indent: 2em;">
+              用户可以通过拖拽数据点来实时调整数据分布，系统会自动计算并显示组内方差（SSW）、组间方差（SSB）、总方差（SST）以及 F 值（F = MSB / MSW）。
+            </p>
+            <p style="text-indent: 2em;">
+                重置按钮可以将数据点恢复到初始状态。F5键会刷新页面，重新生成随机数据。
+            </p>
+        </div>
+      </div>
+      
+      <!-- 右侧：图表区域 -->
+      <div class="w-full md:w-3/4 bg-white rounded-lg shadow-sm p-7 mx-auto my-auto">
+        <svg id="chart" class="w-full" width="1000" height="600"></svg>
+      </div>
+    </div>
+    
+    <!-- Tooltip -->
+    <div class="tooltip" style="opacity:0;"></div>
+  </div>
+  
+  <script>
+    /***********************
+     * 配置与初始化
+     ***********************/
+    const margin = { top: 20, right: 40, bottom: 40, left: 40 },
+          width = 800 - margin.left - margin.right,
+          height = 400 - margin.top - margin.bottom;
+
+    const svg = d3.select("#chart")
+                  .attr("width", width + margin.left + margin.right)
+                  .attr("height", height + margin.top + margin.bottom)
+                  .append("g")
+                  .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const xScale = d3.scaleLinear()
+                     .domain([0, width])
+                     .range([0, width]);
+
+    const groupsData = [
+      { id: 0, y: height / 4, points: [] },
+      { id: 1, y: height / 2, points: [] },
+      { id: 2, y: (3 * height) / 4, points: [] }
+    ];
+
+    const numPointsPerGroup = 10;
+    groupsData.forEach(group => {
+      for (let i = 0; i < numPointsPerGroup; i++) {
+        group.points.push({
+          x: Math.random() * (width - 100) + 50,
+          // 在固定 y 值基础上添加微小随机偏移
+          y: group.y + (Math.random() - 0.5) * 20
+        });
+      }
+    });
+
+    // 保存初始状态用于重置
+    const initialData = JSON.parse(JSON.stringify(groupsData));
+
+    /***********************
+     * 拖拽行为设置
+     ***********************/
+    const drag = d3.drag()
+                   .on("drag", function(event, d) {
+                     d.x = Math.max(0, Math.min(width, event.x));
+                     d3.select(this).attr("cx", xScale(d.x));
+                     updateVisualization();
+                   });
+
+    const tooltip = d3.select(".tooltip");
+
+    /***********************
+     * 绘制初始图形
+     ***********************/
+    function drawVisualization() {
+      groupsData.forEach((group, groupIndex) => {
+        const groupG = svg.append("g")
+                          .attr("class", "group")
+                          .attr("data-group", group.id);
+
+        // 添加“到组均值”的连线
+        group.lines = groupG.selectAll(".line-to-mean")
+                            .data(group.points)
+                            .enter()
+                            .append("line")
+                            .attr("class", "line-to-mean")
+                            .attr("x1", d => xScale(d.x))
+                            .attr("y1", d => d.y)
+                            .attr("x2", d => xScale(d.x))
+                            .attr("y2", d => d.y);
+
+        // 绘制数据点圆圈，并绑定拖拽与 tooltip 事件
+        group.circles = groupG.selectAll(".point")
+                              .data(group.points)
+                              .enter()
+                              .append("circle")
+                              .attr("class", "point")
+                              .attr("cx", d => xScale(d.x))
+                              .attr("cy", d => d.y)
+                              .attr("r", 6)
+                              .call(drag)
+                              .on("mouseover", function(event, d) {
+                                tooltip.transition().duration(200).style("opacity", 0.9);
+                                tooltip.html(`x: ${d.x.toFixed(2)}`)
+                                       .style("left", (event.pageX + 5) + "px")
+                                       .style("top", (event.pageY - 28) + "px");
+                              })
+                              .on("mouseout", function() {
+                                tooltip.transition().duration(500).style("opacity", 0);
+                              });
+
+        // 添加组均值标记（竖线）
+        group.meanLine = groupG.append("line")
+                               .attr("class", "group-mean")
+                               .attr("x1", 0)
+                               .attr("y1", group.y - 20)
+                               .attr("x2", 0)
+                               .attr("y2", group.y + 20);
+      });
+
+      // 绘制总体均值标记：贯穿整个图表的垂直虚线
+      svg.overallMeanLine = svg.append("line")
+                               .attr("class", "overall-mean")
+                               .attr("x1", 0)
+                               .attr("y1", 0)
+                               .attr("x2", 0)
+                               .attr("y2", height);
+
+      // 初次更新
+      updateVisualization();
+    }
+
+    /***********************
+     * 更新函数：重新计算均值、方差并更新图形
+     ***********************/
+    function updateVisualization() {
+      // 1. 计算各组均值
+      groupsData.forEach(group => {
+        const sum = d3.sum(group.points, d => d.x);
+        group.mean = sum / group.points.length;
+      });
+
+      // 2. 计算总体均值
+      const allPoints = groupsData.flatMap(group => group.points);
+      const overallMean = d3.mean(allPoints, d => d.x);
+
+      // 3. 更新各组数据点连线到组均值的位置
+      groupsData.forEach(group => {
+        group.lines
+          .transition()
+          .duration(100)
+          .attr("x1", d => xScale(d.x))
+          .attr("x2", xScale(group.mean));
+      });
+
+      // 4. 更新组均值标记的位置
+      groupsData.forEach(group => {
+        group.meanLine
+          .transition()
+          .duration(100)
+          .attr("x1", xScale(group.mean))
+          .attr("x2", xScale(group.mean));
+      });
+
+      // 5. 更新总体均值标记位置
+      svg.overallMeanLine
+        .transition()
+        .duration(100)
+        .attr("x1", xScale(overallMean))
+        .attr("x2", xScale(overallMean));
+
+      // 6. 计算组内方差（SSW）
+      let ssw = 0;
+      groupsData.forEach(group => {
+        group.ssw = d3.sum(group.points, d => Math.pow(d.x - group.mean, 2));
+        ssw += group.ssw;
+      });
+
+      // 7. 计算组间方差（SSB）
+      let ssb = 0;
+      groupsData.forEach(group => {
+        ssb += group.points.length * Math.pow(group.mean - overallMean, 2);
+      });
+
+      // 8. 计算总方差（SST）
+      let sst = d3.sum(allPoints, d => Math.pow(d.x - overallMean, 2));
+
+      // 9. 更新界面显示的统计数值
+      d3.select("#ssw").text(ssw.toFixed(2));
+      d3.select("#ssb").text(ssb.toFixed(2));
+      d3.select("#sst").text(sst.toFixed(2));
+
+      // 10. 计算 F 值 (F = MSB / MSW)
+      const k = groupsData.length,
+            N = allPoints.length,
+            msb = ssb / (k - 1),
+            msw = ssw / (N - k),
+            fValue = msw === 0 ? 0 : msb / msw;
+      d3.select("#fValue").text(fValue.toFixed(2));
+
+      // 11. 更新数据点圆圈位置
+      groupsData.forEach(group => {
+        group.circles.attr("cx", d => xScale(d.x));
+      });
+    }
+
+    /***********************
+     * 重置功能：恢复初始状态
+     ***********************/
+    d3.select("#reset").on("click", () => {
+      groupsData.forEach((group, i) => {
+        group.points = JSON.parse(JSON.stringify(initialData[i].points));
+        console.log(`Group ${i} points after reset:`, group.points); // 调试输出
+      });
+      svg.selectAll("*").remove();
+      drawVisualization();
+    });
+
+    // 绘制初始可视化图表
+    drawVisualization();
+  </script>
+</body>
+<footer class="flex justify-center items-center py-5 border-t border-gray-200 mt-auto">
+  <div class="max-w-6xl px-4">
+      <p class="text-center text-sm text-gray-500">
+          © 2025 河南科技学院齐安静.
+      </p>
+  </div>
+</footer>
+</html>

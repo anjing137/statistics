@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>中心极限定理模拟</title>
+  <!-- 引入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入 Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- 引入自定义样式 -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans min-h-screen">
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 py-5">
+    <div class="container mx-auto px-4 max-w-6xl flex justify-between items-center">
+      <h1 class="text-2xl font-medium tracking-tight">中心极限定理模拟</h1>
+      <button id="toggle-theme" class="p-2 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors">
+        <i data-lucide="moon" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container mx-auto px-4 py-8 max-w-6xl">
+    <!-- 参数控制区 -->
+    <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+        <div>
+          <label for="distribution" class="block text-sm text-gray-700">分布类型</label>
+          <select id="distribution" class="mt-1 block w-full border border-gray-200 rounded-md p-2">
+            <option value="uniform">均匀分布</option>
+            <option value="exponential">指数分布</option>
+            <option value="normal">正态分布</option>
+            <option value="geometric">几何分布</option>
+          </select>
+        </div>
+        <div>
+          <label for="sampleSize" class="block text-sm text-gray-700">样本大小</label>
+          <input type="number" id="sampleSize" value="30" class="mt-1 block w-full border border-gray-200 rounded-md p-2" />
+        </div>
+        <div>
+          <label for="numSamples" class="block text-sm text-gray-700">抽样次数</label>
+          <input type="number" id="numSamples" value="1000" class="mt-1 block w-full border border-gray-200 rounded-md p-2" />
+        </div>
+        <div class="flex items-end">
+          <button id="runButton" class="bg-blue-600 text-white rounded-md py-2 px-4 text-sm hover:bg-blue-700 transition-colors w-full">
+            运行模拟
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 分布参数控件 -->
+    <div id="paramControls" class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+      <!-- 参数控件会在此处动态生成 -->
+    </div>
+
+    <!-- 图表展示区 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- 理论分布图 -->
+      <div class="bg-white border border-gray-200 rounded-lg p-6">
+        <h2 class="text-xl font-medium mb-2">理论分布</h2>
+        <p class="text-sm text-gray-500 mb-4">以直方图展示所选分布的理论概率质量函数 (PMF) 或概率密度函数 (PDF)。</p>
+        <canvas id="distributionChart" class="w-full h-64"></canvas>
+      </div>
+      <!-- 样本均值分布图 -->
+      <div class="bg-white border border-gray-200 rounded-lg p-6">
+        <h2 class="text-xl font-medium mb-2">样本均值的分布</h2>
+        <p class="text-sm text-gray-500 mb-4">重复抽样后得到的样本均值直方图，展示中心极限定理的效果。</p>
+        <canvas id="samplingChart" class="w-full h-64"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-gray-200 py-5">
+    <div class="container mx-auto px-4 max-w-6xl text-center text-sm text-gray-500">
+      © 2025 河南科技学院齐安静.
+    </div>
+  </footer>
+
+  <!-- 脚本部分 -->
+  <script>
+    // 辅助函数：生成不同分布的随机数
+    function uniformRandom(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+    function exponentialRandom(lambda) {
+      return -Math.log(1 - Math.random()) / lambda;
+    }
+    function normalRandom(mean, stdDev) {
+      let u = 0, v = 0;
+      while(u === 0) u = Math.random();
+      while(v === 0) v = Math.random();
+      let num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+      return num * stdDev + mean;
+    }
+    function geometricRandom(p) {
+      return Math.floor(Math.log(1 - Math.random()) / Math.log(1 - p)) + 1;
+    }
+    
+    // 生成样本均值集合
+    function generateSampleMeans(distributionName, params, sampleSize, numSamples) {
+      const sampleMeans = [];
+      for (let i = 0; i < numSamples; i++) {
+        let sample = [];
+        for (let j = 0; j < sampleSize; j++) {
+          switch (distributionName) {
+            case "uniform":
+              sample.push(uniformRandom(params.uniformMin, params.uniformMax));
+              break;
+            case "exponential":
+              sample.push(exponentialRandom(params.exponentialLambda));
+              break;
+            case "normal":
+              sample.push(normalRandom(params.normalMean, params.normalStdDev));
+              break;
+            case "geometric":
+              sample.push(geometricRandom(params.geometricP));
+              break;
+          }
+        }
+        const sum = sample.reduce((a, b) => a + b, 0);
+        sampleMeans.push(sum / sampleSize);
+      }
+      return sampleMeans;
+    }
+    
+    // 生成直方图数据
+    function createHistogramData(sampleMeans, numBins) {
+      const min = Math.min(...sampleMeans);
+      const max = Math.max(...sampleMeans);
+      const binWidth = (max - min) / numBins;
+      const bins = Array(numBins).fill(0);
+      const labels = [];
+      for (let i = 0; i < numBins; i++) {
+        labels.push((min + i * binWidth).toFixed(2));
+      }
+      for (const mean of sampleMeans) {
+        const binIndex = Math.floor((mean - min) / binWidth);
+        if (binIndex >= 0 && binIndex < numBins) {
+          bins[binIndex]++;
+        }
+      }
+      return { labels: labels, data: bins };
+    }
+    
+    // 生成理论分布数据（用于展示 PMF / PDF）
+    function generateTheoreticalDistributionData(distributionName, params, numBins = 20) {
+      let labels = [];
+      let data = [];
+      let minX, maxX;
+      switch (distributionName) {
+        case "uniform":
+          minX = params.uniformMin;
+          maxX = params.uniformMax;
+          const binWidth = (maxX - minX) / numBins;
+          for (let i = 0; i < numBins; i++) {
+            labels.push((minX + i * binWidth + binWidth / 2).toFixed(2));
+            data.push(1 / (maxX - minX));
+          }
+          break;
+        case "exponential":
+          minX = 0;
+          maxX = 5 / params.exponentialLambda;
+          const expBinWidth = (maxX - minX) / numBins;
+          for (let i = 0; i < numBins; i++) {
+            let x = minX + i * expBinWidth + expBinWidth / 2;
+            labels.push(x.toFixed(2));
+            data.push(params.exponentialLambda * Math.exp(-params.exponentialLambda * x));
+          }
+          break;
+        case "normal":
+          minX = params.normalMean - 4 * params.normalStdDev;
+          maxX = params.normalMean + 4 * params.normalStdDev;
+          const normBinWidth = (maxX - minX) / numBins;
+          for (let i = 0; i < numBins; i++) {
+            let x = minX + i * normBinWidth + normBinWidth / 2;
+            labels.push(x.toFixed(2));
+            const exponent = -((x - params.normalMean) ** 2) / (2 * params.normalStdDev ** 2);
+            const coefficient = 1 / (params.normalStdDev * Math.sqrt(2 * Math.PI));
+            data.push(coefficient * Math.exp(exponent));
+          }
+          break;
+        case "geometric":
+          minX = 1;
+          maxX = 10;
+          for (let i = minX; i <= maxX; i++) {
+            labels.push(i);
+            data.push(params.geometricP * Math.pow(1 - params.geometricP, i - 1));
+          }
+          break;
+      }
+      return { labels: labels, data: data };
+    }
+    
+    // 获取页面元素
+    const distributionSelect = document.getElementById("distribution");
+    const paramControlsDiv = document.getElementById("paramControls");
+    const sampleSizeInput = document.getElementById("sampleSize");
+    const numSamplesInput = document.getElementById("numSamples");
+    const runButton = document.getElementById("runButton");
+    const distributionChartCanvas = document.getElementById("distributionChart");
+    const samplingChartCanvas = document.getElementById("samplingChart");
+    let distributionChart = null;
+    let samplingChart = null;
+    
+    // 根据所选分布生成相应的参数控件
+    function createParameterControls(distributionName) {
+      paramControlsDiv.innerHTML = "";
+      let controlsHTML = "";
+      switch (distributionName) {
+        case "uniform":
+          controlsHTML += `
+            <div class="mb-4">
+              <label for="uniformMin" class="block text-sm text-gray-700">最小值</label>
+              <input type="number" id="uniformMin" value="0" class="mt-1 block w-full border border-gray-200 rounded-md p-2">
+            </div>
+            <div class="mb-4">
+              <label for="uniformMax" class="block text-sm text-gray-700">最大值</label>
+              <input type="number" id="uniformMax" value="1" class="mt-1 block w-full border border-gray-200 rounded-md p-2">
+            </div>
+          `;
+          break;
+        case "exponential":
+          controlsHTML += `
+            <div class="mb-4">
+              <label for="exponentialLambda" class="block text-sm text-gray-700">Lambda</label>
+              <input type="number" id="exponentialLambda" value="1" class="mt-1 block w-full border border-gray-200 rounded-md p-2">
+            </div>
+          `;
+          break;
+        case "normal":
+          controlsHTML += `
+            <div class="mb-4">
+              <label for="normalMean" class="block text-sm text-gray-700">均值</label>
+              <input type="number" id="normalMean" value="0" class="mt-1 block w-full border border-gray-200 rounded-md p-2">
+            </div>
+            <div class="mb-4">
+              <label for="normalStdDev" class="block text-sm text-gray-700">标准差</label>
+              <input type="number" id="normalStdDev" value="1" class="mt-1 block w-full border border-gray-200 rounded-md p-2">
+            </div>
+          `;
+          break;
+        case "geometric":
+          controlsHTML += `
+            <div class="mb-4">
+              <label for="geometricP" class="block text-sm text-gray-700">概率 (p)</label>
+              <input type="number" id="geometricP" value="0.5" min="0" max="1" step="0.01" class="mt-1 block w-full border border-gray-200 rounded-md p-2">
+            </div>
+          `;
+          break;
+      }
+      paramControlsDiv.innerHTML = controlsHTML;
+    }
+    
+    // 读取参数控件的值
+    function getParameterValues(distributionName) {
+      const params = {};
+      switch (distributionName) {
+        case "uniform":
+          params.uniformMin = parseFloat(document.getElementById("uniformMin").value);
+          params.uniformMax = parseFloat(document.getElementById("uniformMax").value);
+          break;
+        case "exponential":
+          params.exponentialLambda = parseFloat(document.getElementById("exponentialLambda").value);
+          break;
+        case "normal":
+          params.normalMean = parseFloat(document.getElementById("normalMean").value);
+          params.normalStdDev = parseFloat(document.getElementById("normalStdDev").value);
+          break;
+        case "geometric":
+          params.geometricP = parseFloat(document.getElementById("geometricP").value);
+          break;
+      }
+      return params;
+    }
+    
+    // 绘制理论分布图
+    function plotTheoreticalDistribution(distributionName, params) {
+      const theoreticalData = generateTheoreticalDistributionData(distributionName, params);
+      if (distributionChart) {
+        distributionChart.destroy();
+      }
+      distributionChart = new Chart(distributionChartCanvas.getContext("2d"), {
+        type: 'bar',
+        data: {
+          labels: theoreticalData.labels,
+          datasets: [{
+            label: '理论分布',
+            data: theoreticalData.data,
+            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          scales: { y: { beginAtZero: true } },
+          animation: false
+        }
+      });
+    }
+    
+    // 初始设置：生成控件和绘制默认图
+    createParameterControls(distributionSelect.value);
+    plotTheoreticalDistribution(distributionSelect.value, getParameterValues(distributionSelect.value));
+    
+    // 事件监听
+    distributionSelect.addEventListener("change", () => {
+      createParameterControls(distributionSelect.value);
+      plotTheoreticalDistribution(distributionSelect.value, getParameterValues(distributionSelect.value));
+    });
+    paramControlsDiv.addEventListener("change", () => {
+      plotTheoreticalDistribution(distributionSelect.value, getParameterValues(distributionSelect.value));
+    });
+    runButton.addEventListener("click", () => {
+      const distributionName = distributionSelect.value;
+      const params = getParameterValues(distributionName);
+      const sampleSize = parseInt(sampleSizeInput.value);
+      const numSamples = parseInt(numSamplesInput.value);
+      const sampleMeans = generateSampleMeans(distributionName, params, sampleSize, numSamples);
+      const histogramData = createHistogramData(sampleMeans, 30);
+      if (samplingChart) {
+        samplingChart.destroy();
+      }
+      samplingChart = new Chart(samplingChartCanvas.getContext("2d"), {
+        type: 'bar',
+        data: {
+          labels: histogramData.labels,
+          datasets: [{
+            label: '样本均值',
+            data: histogramData.data,
+            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          scales: { y: { beginAtZero: true } },
+          animation: false
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>假设检验动态展示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-center mb-3">假设检验动态展示</h1>
+            <p class="text-gray-600 text-center max-w-2xl mx-auto">
+                通过可视化理解样本均值与接受域、拒绝域、临界值的动态关系
+            </p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- 检验类型 -->
+            <div class="bg-white rounded-lg shadow-sm p-5 border border-gray-100">
+                <h2 class="text-lg font-medium mb-4">检验类型</h2>
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <input type="radio" id="leftTailed" name="testType" value="left" checked 
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500">
+                        <label for="leftTailed" class="ml-2 block text-sm">左侧检验 (H₁: μ < μ₀)</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="radio" id="rightTailed" name="testType" value="right" 
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500">
+                        <label for="rightTailed" class="ml-2 block text-sm">右侧检验 (H₁: μ > μ₀)</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="radio" id="twoTailed" name="testType" value="two" 
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500">
+                        <label for="twoTailed" class="ml-2 block text-sm">双侧检验 (H₁: μ ≠ μ₀)</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 检验方法 -->
+            <div class="bg-white rounded-lg shadow-sm p-5 border border-gray-100">
+                <h2 class="text-lg font-medium mb-4">检验方法</h2>
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <input type="radio" id="criticalValue" name="testMethod" value="critical" checked 
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500">
+                        <label for="criticalValue" class="ml-2 block text-sm">临界值法</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="radio" id="pValue" name="testMethod" value="p-value" 
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500">
+                        <label for="pValue" class="ml-2 block text-sm">p值法</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="radio" id="confidenceInterval" name="testMethod" value="ci" 
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500">
+                        <label for="confidenceInterval" class="ml-2 block text-sm">置信区间法</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 参数设置 -->
+            <div class="bg-white rounded-lg shadow-sm p-5 border border-gray-100">
+                <h2 class="text-lg font-medium mb-4">参数设置</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="alphaSlider" class="block text-sm font-medium mb-2">显著性水平 (α)</label>
+                        <div class="flex items-center space-x-3">
+                            <input type="range" id="alphaSlider" min="1" max="20" value="5" 
+                                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="alphaValue" class="text-sm font-medium min-w-[40px]">0.05</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="sampleMeanSlider" class="block text-sm font-medium mb-2">样本均值 (x̄)</label>
+                        <div class="flex items-center space-x-3">
+                            <input type="range" id="sampleMeanSlider" min="-30" max="30" value="0" 
+                                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="sampleMeanValue" class="text-sm font-medium min-w-[40px]">0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 可视化区域 -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-center mb-5">正态分布与检验区域</h2>
+            <div id="visualization" class="w-full h-[360px] relative"></div>
+            
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-lg font-medium mb-2">检验结果</h3>
+                    <div id="testResult" class="p-4 rounded-md bg-gray-50 border border-gray-200 min-h-[120px]">
+                        <p class="text-sm text-gray-500">调整参数以查看检验结果</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-medium mb-2">统计解释</h3>
+                    <div id="explanation" class="p-4 rounded-md bg-gray-50 border border-gray-200 min-h-[120px]">
+                        <p class="text-sm text-gray-500">调整参数以查看统计解释</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 概念解释 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-sm p-5 border border-gray-100">
+                <h3 class="text-lg font-medium mb-3">检验类型说明</h3>
+                <ul class="space-y-2 text-sm">
+                    <li><strong>左侧检验：</strong>用于检验参数是否<span class="text-blue-600">小于</span>某个特定值</li>
+                    <li><strong>右侧检验：</strong>用于检验参数是否<span class="text-blue-600">大于</span>某个特定值</li>
+                    <li><strong>双侧检验：</strong>用于检验参数是否<span class="text-blue-600">不等于</span>某个特定值</li>
+                </ul>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-sm p-5 border border-gray-100">
+                <h3 class="text-lg font-medium mb-3">关键概念</h3>
+                <ul class="space-y-2 text-sm">
+                    <li><strong>接受域：</strong>在此范围内的样本均值不足以拒绝原假设</li>
+                    <li><strong>拒绝域：</strong>在此范围内的样本均值足以拒绝原假设</li>
+                    <li><strong>临界值：</strong>区分接受域与拒绝域的边界值</li>
+                    <li><strong>显著性水平(α)：</strong>犯第一类错误的最大概率</li>
+                </ul>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-sm p-5 border border-gray-100">
+                <h3 class="text-lg font-medium mb-3">检验方法比较</h3>
+                <ul class="space-y-2 text-sm">
+                    <li><strong>临界值法：</strong>比较样本统计量与临界值的关系</li>
+                    <li><strong>p值法：</strong>比较p值与显著性水平α的大小</li>
+                    <li><strong>置信区间法：</strong>检查假设值是否落在置信区间内</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <footer class="py-5 border-t border-gray-200">
+        <div class="max-w-6xl mx-auto px-4">
+            <p class="text-center text-sm text-gray-500">
+                © 2025 河南科技学院齐安静.
+            </p>
+        </div>
+    </footer>
+
+    <script src="normal.js"></script>
+    <script src="visualization.js"></script>
+    <script src="main.js"></script>
+    <script>
+    window.addEventListener("wheel", (e)=> {
+        const isPinching = e.ctrlKey
+        if(isPinching) e.preventDefault()
+    }, { passive: false })
+    </script>
+</body>
+</html>
